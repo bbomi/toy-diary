@@ -49,9 +49,19 @@ function pebbleSvg(color, seed) {
 
 // ── API 헬퍼 ──
 async function api(path, options = {}) {
+    // 인증 토큰 헤더 추가
+    const token = sessionStorage.getItem('diary_token') || '';
+    options.headers = options.headers || {};
+    options.headers['X-Diary-Token'] = token;
+
     const res = await fetch(path, options);
+    if (res.status === 401) {
+        sessionStorage.removeItem('diary_token');
+        location.reload();
+        return;
+    }
     if (!res.ok && res.status !== 404) {
-        throw new Error(`API 오류: ${res.status}`);
+        throw new Error(`API error: ${res.status}`);
     }
     return res.json();
 }

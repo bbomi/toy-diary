@@ -6,3 +6,4 @@ data/uploads/*
 .vercel/
 .env
 diary ref.png
+.vercel

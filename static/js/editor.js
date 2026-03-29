@@ -195,6 +195,7 @@ async function saveEntry(date) {
         pendingFiles.forEach(f => formData.append('photos', f));
         await fetch(`/api/entries/${date}/photos`, {
             method: 'POST',
+            headers: { 'X-Diary-Token': sessionStorage.getItem('diary_token') || '' },
             body: formData
         });
     }

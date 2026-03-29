@@ -1,3 +1,107 @@
+/* ── 잠금 화면 ── */
+.lock-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--bg, #f5f0e8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.lock-box {
+    text-align: center;
+    padding: 40px 30px;
+}
+
+.lock-icon {
+    font-size: 2.5rem;
+    margin-bottom: 8px;
+}
+
+.lock-title {
+    font-family: 'Gaegu', cursive;
+    font-size: 1.8rem;
+    color: #b8926a;
+    font-weight: 700;
+    margin-bottom: 30px;
+}
+
+.pin-dots {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.pin-dots .dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid #b8926a;
+    background: transparent;
+    transition: background 0.15s;
+}
+
+.pin-dots .dot.filled {
+    background: #b8926a;
+}
+
+.pin-dots.shake {
+    animation: shake 0.4s ease-in-out;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-8px); }
+    50% { transform: translateX(8px); }
+    75% { transform: translateX(-4px); }
+}
+
+.lock-error {
+    font-family: 'Gaegu', cursive;
+    font-size: 0.95rem;
+    color: #d4827a;
+    height: 24px;
+    margin-bottom: 16px;
+    font-weight: 700;
+}
+
+.pin-pad {
+    display: grid;
+    grid-template-columns: repeat(3, 70px);
+    gap: 12px;
+    justify-content: center;
+}
+
+.pin-key {
+    width: 70px;
+    height: 56px;
+    border: none;
+    border-radius: 14px;
+    background: #fefcf8;
+    font-family: 'Gaegu', cursive;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #4a4038;
+    cursor: pointer;
+    transition: all 0.1s;
+    box-shadow: 0 2px 6px rgba(120,100,70,0.1);
+}
+
+.pin-key:active:not(:disabled) {
+    transform: scale(0.95);
+    background: #e8ddd1;
+}
+
+.pin-key:disabled {
+    visibility: hidden;
+}
+
+.pin-key.pin-del {
+    font-size: 1.3rem;
+}
+
 /* ── 기본 리셋 + 변수 ── */
 :root {
     --primary: #b8926a;
