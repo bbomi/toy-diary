@@ -1,156 +1,128 @@
-"""일기장 데이터베이스 모듈 - SQLite3 CRUD"""
+"""일기장 데이터베이스 모듈 - Supabase"""
 
-import sqlite3
 import os
+from supabase import create_client
 
-# Vercel serverless: /tmp 사용, 로컬: data/ 사용
-if os.environ.get('VERCEL'):
-    DB_PATH = '/tmp/diary.db'
-else:
-    DB_PATH = os.path.join(os.path.dirname(__file__), 'data', 'diary.db')
+SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://veudufwabuaijixzzhxj.supabase.co')
+SUPABASE_KEY = os.environ.get('SUPABASE_KEY', '')
 
-
-def get_connection():
-    """DB 연결 생성 (WAL 모드, Row 팩토리)"""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
-    return conn
+sb = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_KEY else None
 
 
-def init_db():
-    """테이블 및 인덱스 생성"""
-    conn = get_connection()
-    conn.executescript("""
-        CREATE TABLE IF NOT EXISTS entries (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            date        TEXT NOT NULL UNIQUE,
-            mood        TEXT,
-            content     TEXT NOT NULL DEFAULT '',
-            created_at  TEXT DEFAULT (datetime('now','localtime')),
-            updated_at  TEXT DEFAULT (datetime('now','localtime'))
-        );
-
-        CREATE TABLE IF NOT EXISTS photos (
-            id            INTEGER PRIMARY KEY AUTOINCREMENT,
-            entry_id      INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
-            filename      TEXT NOT NULL,
-            original_name TEXT,
-            created_at    TEXT DEFAULT (datetime('now','localtime'))
-        );
-
-        CREATE TABLE IF NOT EXISTS hashtags (
-            id        INTEGER PRIMARY KEY AUTOINCREMENT,
-            entry_id  INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
-            tag       TEXT NOT NULL
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_entries_date ON entries(date);
-        CREATE INDEX IF NOT EXISTS idx_hashtags_tag ON hashtags(tag);
-        CREATE INDEX IF NOT EXISTS idx_hashtags_entry ON hashtags(entry_id);
-        CREATE INDEX IF NOT EXISTS idx_photos_entry ON photos(entry_id);
-    """)
-    conn.close()
+def _client():
+    """Supabase 클라이언트 반환"""
+    global sb
+    if not sb:
+        key = os.environ.get('SUPABASE_KEY', '')
+        if key:
+            sb = create_client(SUPABASE_URL, key)
+        else:
+            raise RuntimeError("SUPABASE_KEY 환경변수가 필요합니다")
+    return sb
 
 
 # ── 일기 CRUD ──
 
 def upsert_entry(date, mood, content, tags):
     """일기 생성 또는 수정 (날짜 기준 upsert). 해시태그도 함께 저장."""
-    conn = get_connection()
-    cur = conn.cursor()
-    try:
-        # upsert 엔트리
-        cur.execute("""
-            INSERT INTO entries (date, mood, content)
-            VALUES (?, ?, ?)
-            ON CONFLICT(date) DO UPDATE SET
-                mood = excluded.mood,
-                content = excluded.content,
-                updated_at = datetime('now','localtime')
-        """, (date, mood, content))
+    client = _client()
 
-        entry_id = cur.execute(
-            "SELECT id FROM entries WHERE date = ?", (date,)
-        ).fetchone()['id']
+    # upsert 엔트리
+    result = client.table('entries').upsert({
+        'date': date,
+        'mood': mood,
+        'content': content,
+        'updated_at': 'now()',
+    }, on_conflict='date').execute()
 
-        # 해시태그 교체 (기존 삭제 후 새로 삽입)
-        cur.execute("DELETE FROM hashtags WHERE entry_id = ?", (entry_id,))
-        for tag in tags:
-            tag = tag.strip().lstrip('#')
-            if tag:
-                cur.execute(
-                    "INSERT INTO hashtags (entry_id, tag) VALUES (?, ?)",
-                    (entry_id, tag)
-                )
+    entry_id = result.data[0]['id']
 
-        conn.commit()
-        return entry_id
-    finally:
-        conn.close()
+    # 해시태그 교체
+    client.table('hashtags').delete().eq('entry_id', entry_id).execute()
+    for tag in tags:
+        tag = tag.strip().lstrip('#')
+        if tag:
+            client.table('hashtags').insert({
+                'entry_id': entry_id,
+                'tag': tag,
+            }).execute()
+
+    return entry_id
 
 
 def get_entries_by_month(year_month):
     """월별 일기 목록 (달력 + 목록용). year_month: 'YYYY-MM'"""
-    conn = get_connection()
-    rows = conn.execute("""
-        SELECT id, date, mood, SUBSTR(content, 1, 100) as preview FROM entries
-        WHERE date LIKE ? || '%'
-        ORDER BY date
-    """, (year_month,)).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    client = _client()
+    result = client.table('entries') \
+        .select('id, date, mood, content') \
+        .like('date', f'{year_month}%') \
+        .order('date') \
+        .execute()
+
+    entries = []
+    for r in result.data:
+        entries.append({
+            'id': r['id'],
+            'date': r['date'],
+            'mood': r['mood'],
+            'preview': (r['content'] or '')[:100],
+        })
+    return entries
 
 
 def get_entry_by_date(date):
     """일기 상세 조회 (해시태그 + 사진 포함)"""
-    conn = get_connection()
-    entry = conn.execute(
-        "SELECT * FROM entries WHERE date = ?", (date,)
-    ).fetchone()
+    client = _client()
+    result = client.table('entries') \
+        .select('*') \
+        .eq('date', date) \
+        .execute()
 
-    if not entry:
-        conn.close()
+    if not result.data:
         return None
 
-    entry = dict(entry)
-    entry['hashtags'] = [
-        r['tag'] for r in conn.execute(
-            "SELECT tag FROM hashtags WHERE entry_id = ?", (entry['id'],)
-        ).fetchall()
-    ]
-    entry['photos'] = [
-        dict(r) for r in conn.execute(
-            "SELECT id, filename, original_name FROM photos WHERE entry_id = ?",
-            (entry['id'],)
-        ).fetchall()
-    ]
-    conn.close()
+    entry = result.data[0]
+
+    # 해시태그
+    tags_result = client.table('hashtags') \
+        .select('tag') \
+        .eq('entry_id', entry['id']) \
+        .execute()
+    entry['hashtags'] = [r['tag'] for r in tags_result.data]
+
+    # 사진
+    photos_result = client.table('photos') \
+        .select('id, filename, original_name') \
+        .eq('entry_id', entry['id']) \
+        .execute()
+    entry['photos'] = photos_result.data
+
     return entry
 
 
 def delete_entry(date):
     """일기 삭제. 삭제된 사진 파일명 목록 반환."""
-    conn = get_connection()
-    entry = conn.execute(
-        "SELECT id FROM entries WHERE date = ?", (date,)
-    ).fetchone()
+    client = _client()
+    result = client.table('entries') \
+        .select('id') \
+        .eq('date', date) \
+        .execute()
 
-    if not entry:
-        conn.close()
+    if not result.data:
         return []
 
-    # 삭제 전 사진 파일명 수집
-    photos = conn.execute(
-        "SELECT filename FROM photos WHERE entry_id = ?", (entry['id'],)
-    ).fetchall()
-    filenames = [r['filename'] for r in photos]
+    entry_id = result.data[0]['id']
+
+    # 사진 파일명 수집
+    photos = client.table('photos') \
+        .select('filename') \
+        .eq('entry_id', entry_id) \
+        .execute()
+    filenames = [r['filename'] for r in photos.data]
 
     # CASCADE로 해시태그 + 사진 레코드도 삭제됨
-    conn.execute("DELETE FROM entries WHERE id = ?", (entry['id'],))
-    conn.commit()
-    conn.close()
+    client.table('entries').delete().eq('id', entry_id).execute()
+
     return filenames
 
 
@@ -158,30 +130,27 @@ def delete_entry(date):
 
 def add_photo(entry_id, filename, original_name):
     """사진 레코드 추가"""
-    conn = get_connection()
-    conn.execute(
-        "INSERT INTO photos (entry_id, filename, original_name) VALUES (?, ?, ?)",
-        (entry_id, filename, original_name)
-    )
-    conn.commit()
-    conn.close()
+    client = _client()
+    client.table('photos').insert({
+        'entry_id': entry_id,
+        'filename': filename,
+        'original_name': original_name,
+    }).execute()
 
 
 def delete_photo(photo_id):
     """사진 레코드 삭제. 삭제된 파일명 반환."""
-    conn = get_connection()
-    row = conn.execute(
-        "SELECT filename FROM photos WHERE id = ?", (photo_id,)
-    ).fetchone()
+    client = _client()
+    result = client.table('photos') \
+        .select('filename') \
+        .eq('id', photo_id) \
+        .execute()
 
-    if not row:
-        conn.close()
+    if not result.data:
         return None
 
-    filename = row['filename']
-    conn.execute("DELETE FROM photos WHERE id = ?", (photo_id,))
-    conn.commit()
-    conn.close()
+    filename = result.data[0]['filename']
+    client.table('photos').delete().eq('id', photo_id).execute()
     return filename
 
 
@@ -189,26 +158,47 @@ def delete_photo(photo_id):
 
 def get_all_hashtags():
     """전체 해시태그 + 사용 횟수"""
-    conn = get_connection()
-    rows = conn.execute("""
-        SELECT tag, COUNT(*) as count
-        FROM hashtags
-        GROUP BY tag
-        ORDER BY count DESC, tag
-    """).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    client = _client()
+    result = client.table('hashtags') \
+        .select('tag') \
+        .execute()
+
+    # Python에서 집계
+    counts = {}
+    for r in result.data:
+        tag = r['tag']
+        counts[tag] = counts.get(tag, 0) + 1
+
+    return sorted(
+        [{'tag': t, 'count': c} for t, c in counts.items()],
+        key=lambda x: (-x['count'], x['tag'])
+    )
 
 
 def get_entries_by_hashtag(tag):
     """특정 해시태그가 있는 일기 목록"""
-    conn = get_connection()
-    rows = conn.execute("""
-        SELECT e.id, e.date, e.mood, SUBSTR(e.content, 1, 100) as preview
-        FROM entries e
-        JOIN hashtags h ON h.entry_id = e.id
-        WHERE h.tag = ?
-        ORDER BY e.date DESC
-    """, (tag,)).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    client = _client()
+
+    # 해당 태그의 entry_id 조회
+    tag_result = client.table('hashtags') \
+        .select('entry_id') \
+        .eq('tag', tag) \
+        .execute()
+
+    entry_ids = [r['entry_id'] for r in tag_result.data]
+    if not entry_ids:
+        return []
+
+    # 해당 엔트리 조회
+    result = client.table('entries') \
+        .select('id, date, mood, content') \
+        .in_('id', entry_ids) \
+        .order('date', desc=True) \
+        .execute()
+
+    return [{
+        'id': r['id'],
+        'date': r['date'],
+        'mood': r['mood'],
+        'preview': (r['content'] or '')[:100],
+    } for r in result.data]

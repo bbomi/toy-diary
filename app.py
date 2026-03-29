@@ -1,8 +1,8 @@
-"""일기장 Flask 서버"""
+"""일기장 Flask 서버 - Supabase backend"""
 
 import os
 import uuid
-from flask import Flask, request, jsonify, send_from_directory, render_template
+from flask import Flask, request, jsonify, redirect, render_template
 from werkzeug.utils import secure_filename
 
 import db
@@ -10,16 +10,17 @@ import db
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
 
-# Vercel serverless: /tmp 사용, 로컬: data/uploads 사용
-if os.environ.get('VERCEL'):
-    UPLOAD_DIR = '/tmp/uploads'
-else:
-    UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'data', 'uploads')
+SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://veudufwabuaijixzzhxj.supabase.co')
+STORAGE_BUCKET = 'diary-photos'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'heic'}
 
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def storage_public_url(filename):
+    return f"{SUPABASE_URL}/storage/v1/object/public/{STORAGE_BUCKET}/{filename}"
 
 
 # ── 페이지 ──
@@ -33,17 +34,15 @@ def index():
 
 @app.route('/api/entries')
 def list_entries():
-    """월별 일기 목록. ?month=2026-03"""
     month = request.args.get('month', '')
     if not month:
-        return jsonify({'error': 'month 파라미터 필요'}), 400
+        return jsonify({'error': 'month parameter required'}), 400
     entries = db.get_entries_by_month(month)
     return jsonify(entries)
 
 
 @app.route('/api/entries/<date>')
 def get_entry(date):
-    """일기 상세 조회"""
     entry = db.get_entry_by_date(date)
     if not entry:
         return jsonify(None), 404
@@ -52,10 +51,9 @@ def get_entry(date):
 
 @app.route('/api/entries', methods=['POST'])
 def save_entry():
-    """일기 생성/수정"""
     data = request.get_json()
     if not data or not data.get('date'):
-        return jsonify({'error': 'date 필수'}), 400
+        return jsonify({'error': 'date required'}), 400
 
     tags = [t.strip().lstrip('#') for t in data.get('hashtags', '').split(',') if t.strip()]
     entry_id = db.upsert_entry(
@@ -69,12 +67,14 @@ def save_entry():
 
 @app.route('/api/entries/<date>', methods=['DELETE'])
 def delete_entry(date):
-    """일기 삭제 (사진 파일도 함께 삭제)"""
     filenames = db.delete_entry(date)
-    for f in filenames:
-        path = os.path.join(UPLOAD_DIR, f)
-        if os.path.exists(path):
-            os.remove(path)
+    # Supabase Storage에서 사진 파일 삭제
+    if filenames:
+        try:
+            client = db._client()
+            client.storage.from_(STORAGE_BUCKET).remove(filenames)
+        except Exception:
+            pass
     return jsonify({'deleted': True})
 
 
@@ -82,18 +82,25 @@ def delete_entry(date):
 
 @app.route('/api/entries/<date>/photos', methods=['POST'])
 def upload_photos(date):
-    """사진 업로드"""
     entry = db.get_entry_by_date(date)
     if not entry:
-        return jsonify({'error': '일기를 먼저 저장하세요'}), 404
+        return jsonify({'error': 'save entry first'}), 404
 
+    client = db._client()
     files = request.files.getlist('photos')
     uploaded = []
     for f in files:
         if f and allowed_file(f.filename):
             ext = f.filename.rsplit('.', 1)[1].lower()
             filename = f"{uuid.uuid4().hex}.{ext}"
-            f.save(os.path.join(UPLOAD_DIR, filename))
+            file_bytes = f.read()
+            content_type = f.content_type or 'image/jpeg'
+
+            client.storage.from_(STORAGE_BUCKET).upload(
+                filename,
+                file_bytes,
+                file_options={"content-type": content_type}
+            )
             db.add_photo(entry['id'], filename, secure_filename(f.filename))
             uploaded.append(filename)
 
@@ -102,40 +109,35 @@ def upload_photos(date):
 
 @app.route('/api/photos/<int:photo_id>', methods=['DELETE'])
 def delete_photo(photo_id):
-    """사진 개별 삭제"""
     filename = db.delete_photo(photo_id)
     if not filename:
-        return jsonify({'error': '사진 없음'}), 404
+        return jsonify({'error': 'photo not found'}), 404
 
-    path = os.path.join(UPLOAD_DIR, filename)
-    if os.path.exists(path):
-        os.remove(path)
+    try:
+        client = db._client()
+        client.storage.from_(STORAGE_BUCKET).remove([filename])
+    except Exception:
+        pass
     return jsonify({'deleted': True})
 
 
 @app.route('/uploads/<filename>')
 def serve_upload(filename):
-    """업로드된 사진 서빙"""
-    return send_from_directory(UPLOAD_DIR, filename)
+    """Supabase Storage public URL로 리다이렉트"""
+    return redirect(storage_public_url(filename))
 
 
 # ── 해시태그 API ──
 
 @app.route('/api/hashtags')
 def list_hashtags():
-    """전체 해시태그 목록"""
     return jsonify(db.get_all_hashtags())
 
 
 @app.route('/api/hashtags/<tag>')
 def entries_by_hashtag(tag):
-    """해시태그별 일기 목록"""
     return jsonify(db.get_entries_by_hashtag(tag))
 
-
-# ── 초기화 (Vercel + 로컬 공용) ──
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-db.init_db()
 
 # ── 서버 실행 (로컬) ──
 if __name__ == '__main__':
