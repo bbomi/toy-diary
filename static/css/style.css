@@ -1,0 +1,752 @@
+/* ── 기본 리셋 + 변수 ── */
+:root {
+    --primary: #b8926a;
+    --primary-light: #e8ddd1;
+    --bg: #f5f0e8;
+    --card: #fefcf8;
+    --text: #4a4038;
+    --text-light: #9b9084;
+    --border: #e0d8ce;
+    --radius: 16px;
+    --shadow: 0 2px 12px rgba(120,100,70,0.08);
+    --font-diary: 'Gaegu', 'Nanum Pen Script', cursive;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: var(--font-diary);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 16px;
+}
+
+/* ── 헤더 ── */
+header {
+    background: var(--card);
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+}
+
+.logo {
+    font-family: var(--font-diary);
+    font-size: 1.8rem;
+    color: var(--primary);
+    cursor: pointer;
+    user-select: none;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+/* ── 메인 컨테이너 ── */
+#app {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 16px;
+}
+
+/* ── 뷰 헤더 (네비 + 아이콘) ── */
+.view-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.view-icons {
+    display: flex;
+    gap: 4px;
+}
+
+.view-icon-btn {
+    background: none;
+    border: none;
+    padding: 6px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--text-light);
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.view-icon-btn:hover {
+    background: var(--primary-light);
+    color: var(--text);
+}
+
+.view-icon-btn.active {
+    color: var(--primary);
+    background: var(--primary-light);
+}
+
+/* ── 달력 ── */
+.calendar-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.calendar-nav button {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text);
+    padding: 4px 12px;
+    border-radius: 8px;
+    font-family: var(--font-diary);
+}
+
+.calendar-nav button:hover {
+    background: var(--primary-light);
+}
+
+.calendar-nav .month-label {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: 20px;
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 12px 8px;
+    box-shadow: var(--shadow);
+}
+
+.calendar-grid .day-header {
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--text-light);
+    padding: 6px 0;
+    font-weight: 700;
+}
+
+.calendar-grid .day-header:first-child { color: #d4827a; }
+.calendar-grid .day-header:last-child { color: #7aaed4; }
+
+.day-cell {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 1rem;
+    position: relative;
+    transition: background 0.15s;
+}
+
+.day-cell:hover {
+    background: var(--primary-light);
+}
+
+.day-cell.empty {
+    cursor: default;
+}
+
+.day-cell.empty:hover {
+    background: none;
+}
+
+.day-cell.today {
+    border: 2px solid var(--primary);
+}
+
+.day-cell .day-num {
+    font-weight: 700;
+    font-size: 0.95rem;
+    position: relative;
+    z-index: 2;
+}
+
+/* 조약돌 모양 무드 (일자와 겹침) */
+.mood-pebble {
+    position: absolute;
+    inset: 3px;
+    z-index: 1;
+    opacity: 0.45;
+}
+
+/* 각 무드별 조약돌 SVG 인라인 (비정형 모양) */
+.mood-pebble svg {
+    width: 100%;
+    height: 100%;
+}
+
+.day-cell.sunday .day-num { color: #d4827a; }
+.day-cell.saturday .day-num { color: #7aaed4; }
+
+/* 무드가 있는 날은 일자 색상을 진하게 */
+.day-cell.has-mood .day-num {
+    color: var(--text);
+    text-shadow: 0 0 2px rgba(255,255,255,0.8);
+}
+
+/* ── 해시태그 클라우드 (달력 하단) ── */
+.hashtag-cloud {
+    margin-top: 12px;
+    padding: 16px;
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+.hashtag-cloud h3 {
+    font-size: 1rem;
+    color: var(--text-light);
+    margin-bottom: 10px;
+}
+
+.hashtag-cloud .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.tag-pill {
+    display: inline-block;
+    padding: 5px 14px;
+    background: var(--primary-light);
+    color: var(--primary);
+    border-radius: 20px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.15s;
+    border: none;
+    font-family: var(--font-diary);
+    font-weight: 700;
+}
+
+.tag-pill:hover {
+    background: var(--primary);
+    color: white;
+}
+
+.tag-pill .count {
+    font-size: 0.85rem;
+    opacity: 0.7;
+    margin-left: 4px;
+}
+
+/* ── 일기 작성 폼 ── */
+.entry-form {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 24px;
+    box-shadow: var(--shadow);
+}
+
+.entry-form .form-date {
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+    color: var(--primary);
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 1.05rem;
+    color: var(--text-light);
+    margin-bottom: 8px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+}
+
+/* 무드 선택 (조약돌 + 라벨) */
+.mood-selector {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.mood-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    border: 2px solid transparent;
+    border-radius: 14px;
+    cursor: pointer;
+    background: none;
+    transition: all 0.15s;
+    font-family: var(--font-diary);
+}
+
+.mood-btn:hover {
+    background: var(--primary-light);
+}
+
+.mood-btn.selected {
+    border-color: var(--primary);
+    background: var(--primary-light);
+}
+
+.mood-btn .mood-pebble-icon {
+    width: 36px;
+    height: 32px;
+}
+
+.mood-btn .mood-pebble-icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+.mood-btn .mood-label {
+    font-size: 0.9rem;
+    color: var(--text-light);
+    font-weight: 700;
+}
+
+.mood-btn.selected .mood-label {
+    color: var(--primary);
+}
+
+/* 텍스트 입력 */
+.entry-form textarea {
+    width: 100%;
+    min-height: 200px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 1.1rem;
+    font-family: var(--font-diary);
+    resize: vertical;
+    line-height: 1.8;
+    background: var(--bg);
+    color: var(--text);
+}
+
+.entry-form textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: white;
+}
+
+.entry-form input[type="text"] {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 1.05rem;
+    font-family: var(--font-diary);
+    background: var(--bg);
+    color: var(--text);
+}
+
+.entry-form input[type="text"]:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: white;
+}
+
+/* 해시태그 자동완성 */
+.tag-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.tag-suggestions .tag-pill {
+    font-size: 0.9rem;
+    padding: 4px 10px;
+    opacity: 0.6;
+}
+
+.tag-suggestions .tag-pill:hover {
+    opacity: 1;
+}
+
+.tag-suggestions .tag-pill.used {
+    opacity: 1;
+    background: var(--primary);
+    color: white;
+}
+
+/* 사진 업로드 */
+.photo-upload-area {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    color: var(--text-light);
+    transition: border-color 0.15s;
+    background: var(--bg);
+    font-size: 1rem;
+    font-family: var(--font-diary);
+    font-weight: 700;
+}
+
+.photo-upload-area:hover {
+    border-color: var(--primary);
+}
+
+.photo-previews {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.photo-preview {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.photo-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.photo-preview .remove-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: rgba(0,0,0,0.5);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 버튼 */
+.btn {
+    padding: 10px 24px;
+    border: none;
+    border-radius: 10px;
+    font-size: 1.05rem;
+    cursor: pointer;
+    font-weight: 700;
+    transition: all 0.15s;
+    font-family: var(--font-diary);
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-primary:hover {
+    opacity: 0.9;
+}
+
+.btn-secondary {
+    background: var(--border);
+    color: var(--text);
+}
+
+.btn-secondary:hover {
+    background: #d0c8be;
+}
+
+.btn-danger {
+    background: #d4827a;
+    color: white;
+}
+
+.btn-danger:hover {
+    opacity: 0.9;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 24px;
+}
+
+/* ── 일기 상세 보기 ── */
+.entry-view {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 24px;
+    box-shadow: var(--shadow);
+}
+
+.entry-view .view-date {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 8px;
+}
+
+.entry-view .view-mood {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.entry-view .view-mood .mood-pebble-icon {
+    width: 32px;
+    height: 28px;
+}
+
+.entry-view .view-mood .mood-pebble-icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+.entry-view .view-mood .mood-label {
+    font-size: 1.1rem;
+    color: var(--text-light);
+    font-weight: 700;
+}
+
+.entry-view .view-content {
+    font-size: 1.15rem;
+    line-height: 2;
+    white-space: pre-wrap;
+    margin-bottom: 20px;
+    color: var(--text);
+}
+
+.entry-view .view-photos {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.entry-view .view-photos img {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+.entry-view .view-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 24px;
+}
+
+.view-actions {
+    display: flex;
+    gap: 10px;
+}
+
+/* ── 해시태그 필터 뷰 ── */
+.hashtag-view h2 {
+    font-size: 1.3rem;
+    margin-bottom: 16px;
+}
+
+.hashtag-view h2 span {
+    color: var(--primary);
+}
+
+.entry-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.entry-card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: transform 0.1s;
+}
+
+.entry-card:hover {
+    transform: translateY(-1px);
+}
+
+.entry-card .card-mood {
+    width: 28px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.entry-card .card-mood svg {
+    width: 100%;
+    height: 100%;
+}
+
+.entry-card .card-date {
+    font-size: 0.95rem;
+    color: var(--text-light);
+}
+
+.entry-card .card-preview {
+    font-size: 1rem;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── 목록 뷰 ── */
+.list-filter {
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    color: var(--text-light);
+    font-weight: 700;
+    user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--primary);
+    cursor: pointer;
+}
+
+.list-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--card);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: transform 0.1s;
+    box-shadow: var(--shadow);
+}
+
+.list-item:hover {
+    transform: translateY(-1px);
+}
+
+.list-item .list-date {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 40px;
+    flex-shrink: 0;
+}
+
+.list-item .list-day {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1;
+}
+
+.list-item .list-dow {
+    font-size: 0.75rem;
+    color: var(--text-light);
+    font-weight: 700;
+}
+
+.list-item .list-mood {
+    width: 28px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.list-item .list-mood-pebble {
+    width: 28px;
+    height: 24px;
+}
+
+.list-item .list-mood-pebble svg {
+    width: 100%;
+    height: 100%;
+}
+
+.list-item .list-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.list-item .list-preview {
+    font-size: 1rem;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.list-item .list-empty-hint {
+    font-size: 0.9rem;
+    color: var(--border);
+}
+
+.list-item:not(.has-entry) {
+    opacity: 0.5;
+}
+
+.list-item:not(.has-entry):hover {
+    opacity: 0.7;
+}
+
+/* ── 이미지 모달 (사진 확대) ── */
+.photo-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    cursor: pointer;
+}
+
+.photo-modal img {
+    max-width: 90vw;
+    max-height: 90vh;
+    border-radius: 8px;
+}
+
+/* ── 빈 상태 ── */
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-light);
+}
+
+.empty-state .emoji {
+    font-size: 3rem;
+    margin-bottom: 12px;
+}
+
+/* ── 반응형 ── */
+@media (max-width: 480px) {
+    #app { padding: 12px; }
+    .day-cell { font-size: 0.85rem; }
+    .mood-btn { padding: 8px 10px; }
+    .mood-btn .mood-pebble-icon { width: 30px; height: 26px; }
+    .entry-form textarea { min-height: 150px; }
+}

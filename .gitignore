@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+data/diary.db
+data/uploads/*
+!data/uploads/.gitkeep
+.vercel/
+.env
+diary ref.png
