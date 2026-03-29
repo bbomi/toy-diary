@@ -57,8 +57,10 @@ async function api(path, options = {}) {
     const res = await fetch(path, options);
     if (res.status === 401) {
         sessionStorage.removeItem('diary_token');
-        location.reload();
-        return;
+        // 잠금화면으로 돌아가기 (리로드 대신)
+        document.getElementById('mainApp').style.display = 'none';
+        document.getElementById('lockScreen').style.display = 'flex';
+        return null;
     }
     if (!res.ok && res.status !== 404) {
         throw new Error(`API error: ${res.status}`);
@@ -107,5 +109,8 @@ function router() {
     }
 }
 
-window.addEventListener('hashchange', router);
-window.addEventListener('load', router);
+// 인증 완료 후 라우터 시작 (auth.js에서 호출)
+function startApp() {
+    router();
+    window.addEventListener('hashchange', router);
+}

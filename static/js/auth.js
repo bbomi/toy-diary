@@ -1,12 +1,14 @@
 /* ── PIN 인증 ── */
 
 let pinInput = '';
-let authToken = sessionStorage.getItem('diary_token') || '';
 
-// 이미 인증된 세션이면 바로 앱 표시
-if (authToken) {
-    showApp();
-}
+// 페이지 로드 시 세션 확인
+document.addEventListener('DOMContentLoaded', function() {
+    const saved = sessionStorage.getItem('diary_token');
+    if (saved) {
+        showApp();
+    }
+});
 
 function pressKey(num) {
     if (pinInput.length >= 4) return;
@@ -41,14 +43,12 @@ async function verifyPin() {
         const data = await res.json();
 
         if (data.ok) {
-            authToken = data.token;
-            sessionStorage.setItem('diary_token', authToken);
+            sessionStorage.setItem('diary_token', data.token);
             showApp();
         } else {
             document.getElementById('lockError').textContent = 'wrong password';
             pinInput = '';
             updateDots();
-            // 흔들기 애니메이션
             const dots = document.getElementById('pinDots');
             dots.classList.add('shake');
             setTimeout(() => dots.classList.remove('shake'), 500);
@@ -63,4 +63,8 @@ async function verifyPin() {
 function showApp() {
     document.getElementById('lockScreen').style.display = 'none';
     document.getElementById('mainApp').style.display = 'block';
+    // 인증 완료 후 라우터 시작
+    if (typeof startApp === 'function') {
+        startApp();
+    }
 }
